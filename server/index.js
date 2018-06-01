@@ -3,6 +3,12 @@ const express = require("express");
 const http = require("http");
 const WebSocket = require("ws");
 const uuidv4 = require("uuid/v4");
+const { promisify } = require("util");
+
+const redis = require("redis");
+const redisClient = redis.createClient();
+const redisPublisher = redis.createClient();
+const redisSubscriber = redis.createClient();
 
 const app = express();
 
@@ -18,12 +24,20 @@ const server = http.createServer(app);
 // Initialize the WebSocket server instance
 const wss = new WebSocket.Server({ server });
 
+const redisLpush = promisify(redisClient.lpush).bind(redisClient);
+const redisLrange = promisify(redisClient.lrange).bind(redisClient);
+
 /*
  * Subscribe a socket to a specific channel.
  */
 function subscribe(socket, channel) {
     let socketSubscribed = socketsPerChannels.get(channel) || new Set();
     let channelSubscribed = channelsPerSocket.get(socket) || new Set();
+
+    if (socketSubscribed.size == 0) {
+        console.log("Subscribed to " + channel);
+        redisSubscriber.subscribe(channel);
+    }
 
     socketSubscribed = socketSubscribed.add(socket);
     channelSubscribed = channelSubscribed.add(channel);
@@ -41,6 +55,11 @@ function unsubscribe(socket, channel) {
 
     socketSubscribed.delete(socket);
     channelSubscribed.delete(channel);
+
+    if (socketSubscribed.size == 0) {
+        console.log("Unsubscribed to " + channel);
+        redisSubscriber.unsubscribe(channel);
+    }
 
     socketsPerChannels.set(channel, socketSubscribed);
     channelsPerSocket.set(socket, channelSubscribed);
@@ -68,9 +87,26 @@ function broadcastToSockets(channel, data) {
     });
 }
 
+function getOldMessages(channel) {
+    redisLrange(channel, 0, -1)
+        .then(reply => {
+            console.log(reply);
+            reply.forEach(element => {
+                broadcastToSockets(channel, element);
+            });
+        })
+        .catch(err => {
+            console.log(err);
+        });
+}
+
+redisSubscriber.on("message", function(channel, message) {
+    broadcastToSockets(channel, message);
+});
+
 // Broadcast message from client
 wss.on("connection", ws => {
-    ws.on('close', () => {
+    ws.on("close", () => {
         unsubscribeAll(ws);
     });
 
@@ -78,11 +114,17 @@ wss.on("connection", ws => {
         const message = JSON.parse(data.toString());
 
         switch (message.type) {
-            case 'subscribe':
+            case "subscribe":
                 subscribe(ws, message.channel);
+                getOldMessages(message.channel);
                 break;
             default:
-                broadcastToSockets(message.channel, data);
+                redisPublisher.publish(message.channel, data);
+                redisLpush(message.channel, data)
+                    .then()
+                    .catch(err => {
+                        console.log(err);
+                    });
                 break;
         }
     });
