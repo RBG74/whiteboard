@@ -57,13 +57,17 @@ module.exports = class SubscriptionManager {
         });
     }
 
-    //Broadcast a message to all sockets connected to this server.
-    broadcastToSockets(channel, data) {
-        const socketSubscribed =
-            this.socketsPerChannels.get(channel) || new Set();
-
-        socketSubscribed.forEach(client => {
-            client.send(data);
-        });
+    // Get the last 2000 messages published in the channel and broadcasts them to the channel
+    getOldMessages(channel) {
+        redisLrange(channel, 0, 2000)
+            .then(reply => {
+                //console.log(reply);
+                reply.forEach(element => {
+                    subManager.broadcastToSockets(channel, element);
+                });
+            })
+            .catch(err => {
+                console.log(err);
+            });
     }
 };

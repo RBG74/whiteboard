@@ -28,19 +28,6 @@ const subManager = new SubscriptionManager(redisSubscriber);
 
 const targetsPerChannel = new Map();
 
-function getOldMessages(channel) {
-    redisLrange(channel, 0, 2000)
-        .then(reply => {
-            //console.log(reply);
-            reply.forEach(element => {
-                subManager.broadcastToSockets(channel, element);
-            });
-        })
-        .catch(err => {
-            console.log(err);
-        });
-}
-
 redisSubscriber.on("message", function(channel, message) {
     console.log(channel, message);
     subManager.broadcastToSockets(channel, message);
@@ -59,7 +46,7 @@ wss.on("connection", ws => {
         switch (message.type) {
             case "subscribe":
                 subManager.subscribe(ws, message.channel);
-                getOldMessages(message.channel);
+                subManager.getOldMessages(message.channel);
                 break;
             case "shoot":
                 "";
