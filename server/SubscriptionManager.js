@@ -1,4 +1,3 @@
-const promisify = require("util").promisify;
 
 module.exports = class SubscriptionManager {
   constructor(redisclientmanager) {
@@ -72,13 +71,11 @@ module.exports = class SubscriptionManager {
     socketSubscribed.forEach(client => {
       client.send(data);
     });
-    //console.log("Broadcasting", data, "to", socketSubscribed.size,"clients.")
   }
 
   // Get the last 2000 messages published in the channel and broadcasts them to the channel
   getOldMessages(channel) {
-    const redisLrange = promisify(this.rcm.client.lrange).bind(this.rcm.client);
-    redisLrange(channel, 0, 2000)
+    this.rcm.redisLrange(channel, 0, 2000)
       .then(reply => {
         reply.forEach(element => {
           this.broadcastToSockets(channel, element);

@@ -44,3 +44,8 @@ body, html {
 #color-picker .color:hover {
     transform: scale(1.4);
 }
+
+#leaderboard {
+    position: absolute;
+    color: rgba(0, 0, 0, 0.3)
+}
