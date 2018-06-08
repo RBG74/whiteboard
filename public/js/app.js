@@ -17,6 +17,7 @@ container.appendChild(canvas);
 const ctx = canvas.getContext("2d");
 
 // Draw in the canvas for draw message received
+//problème de connexion avec heroku si pas en wss, mais ne passe pas sur le local
 let ws = "wss";
 if(window.location.host == "localhost:5000"){
     ws = "ws";
