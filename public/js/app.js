@@ -60,7 +60,7 @@ socket.addEventListener("message", event => {
             ctx,
             message.x,
             message.y,
-            "#ffffff",
+            message.color,
             message.size
         );
     }
@@ -135,7 +135,3 @@ const onMouseUp = () => {
 };
 
 canvas.addEventListener("click", onMouseDown, false);
-
-//canvas.addEventListener("mousemove", onMouseMove, false);
-//canvas.addEventListener("mousedown", onMouseDown, false);
-//canvas.addEventListener("mouseup", onMouseUp, false);

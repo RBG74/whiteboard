@@ -16,6 +16,9 @@ const wss = new WebSocket.Server({ server });
 // Initialize redis clients
 const rcm = require("./redisClientManager");
 
+// Manager for target
+const targetManager = require("./targetsManager");
+
 // Promosify the redis function we're gonna use
 const redisLpush = promisify(rcm.client.lpush).bind(rcm.client);
 const redisLrange = promisify(rcm.client.lrange).bind(rcm.client);
@@ -52,70 +55,17 @@ wss.on("connection", ws => {
                     let diffY = position.y - message.payload.y;
                     if((diffX >= -10 && diffX <= 10) && (diffY >= -10 && diffY <= 10)){
                         targets.delete(position);
-                        publishCleanToChannel(position.x, position.y, message.channel);
-
+                        targetManager.publishToChannel(position.x, position.y, message.channel,"clean","white",12);
                     }
                 });
                 break;
             default:
-                /*rcm.publisher.publish(message.channel, data);
-                redisLpush(message.channel, data)
-                    .catch(err => {
-                        console.log(err);
-                    });*/
                 break;
         }
     });
 });
 
-function getCoordinatesInRange(maxX, maxY) {
-    const x = Math.floor(Math.random() * maxX);
-    const y = Math.floor(Math.random() * maxY);
-    return { x: x, y: y };
-}
 
-function targetsManagement() {
-    //console.log("Targets management");
-    subManager.channelsUsed.forEach(channel => {
-        setTargetsForAChannel(channel);
-    });
-}
-
-function setTargetsForAChannel(channel) {
-    let targets = targetsPerChannel.get(channel) || new Set();
-    if (targets.size < 3) {
-        const coordinates = getCoordinatesInRange(800, 500);
-        targets = targets.add(coordinates);
-        console.log("ecriture de :");
-        targetsPerChannel.set(channel, targets);
-
-        publishTargetToChannel(coordinates.x, coordinates.y, channel);
-    }
-}
-
-function publishTargetToChannel(x, y, channel) {
-    const payload = JSON.stringify({
-        channel: channel,
-        type: "target",
-        x: x,
-        y: y,
-        color: "red",
-        size: 10
-    });
-    rcm.publisher.publish(channel, payload);
-}
-
-function publishCleanToChannel(x, y, channel){
-    const payload = JSON.stringify({
-        channel: channel,
-        type: "clean",
-        x: x,
-        y: y,
-        color: "white",
-        size: 12
-    });
-    rcm.publisher.publish(channel, payload);
-}
 
 // Assign a random channel to people opening the application
 app.get("/", (req, res) => {
@@ -134,5 +84,5 @@ app.use(express.static(PUBLIC_FOLDER));
 
 server.listen(PORT, () => {
     console.log(`Server started on port ${server.address().port}`);
-    setInterval(() => targetsManagement(), 5000);
+    setInterval(() => targetManager.targetsManagement(), 5000);
 });
