@@ -13,5 +13,14 @@
     "redis": "^2.8.0",
     "uuid": "^3.2.1",
     "ws": "^5.1.1"
-  }
+  },
+  "devDependencies": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RBG74/whiteboard.git"
+  },
+  "bugs": {
+    "url": "https://github.com/RBG74/whiteboard/issues"
+  },
+  "homepage": "https://github.com/RBG74/whiteboard#readme"
 }

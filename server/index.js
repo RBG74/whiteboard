@@ -21,80 +21,60 @@ const redisconfig = require("./redis.config");
 const RedisClientManager = require("./RedisClientManager");
 const rcm = new RedisClientManager(redisconfig);
 
-
-// Promosify the redis function we're gonna use
-//const redisLpush = promisify(rcm.client.lpush).bind(rcm.client);
-//const redisLrange = promisify(rcm.client.lrange).bind(rcm.client);
-
+// Initialize the SubscriptionManager which handles subscription/unsubscription from channel and broadcasting to them
 const SubscriptionManager = require("./SubscriptionManager");
 const subManager = new SubscriptionManager(rcm);
 
-const targetsPerChannel = new Map();
-
 // Manager for target
-const targetManager = require("./targetsManager");
-const targManager = new targetManager(rcm, subManager, targetsPerChannel);
+const TargetsManager = require("./TargetsManager");
+const targetsManager = new TargetsManager(rcm, subManager);
 
 rcm.subscriber.on("message", function(channel, message) {
-    subManager.broadcastToSockets(channel, message);
+  subManager.broadcastToSockets(channel, message);
 });
 
 // Broadcast message from client
 wss.on("connection", ws => {
-    ws.on("close", () => {
-        subManager.unsubscribeAll(ws);
-    });
+  ws.on("close", () => {
+    subManager.unsubscribeAll(ws);
+  });
 
-    ws.on("message", async data => {
-        //TODO: handle socket shooting target
-        const message = JSON.parse(data.toString());
+  ws.on("message", async data => {
+    const message = JSON.parse(data.toString());
 
-        switch (message.type) {
-            case "subscribe":
-                if (isNullOrUndefined(message.name))
-                    message.name = await usernameProvider.getRandomUsername();
-                subManager.subscribe(ws, message.channel, message.name);
-                subManager.getOldMessages(message.channel);
-                break;
-            case "shoot":
-                const targets = targetsPerChannel.get(message.channel);
-                targets.forEach(position => {
-                    let diffX = position.x - message.payload.x;
-                    let diffY = position.y - message.payload.y;
-                    if (
-                        diffX >= -10 &&
-                        diffX <= 10 &&
-                        (diffY >= -10 && diffY <= 10)
-                    ) {
-                        targets.delete(position);
-                        targManager.publishToChannel(position.x, position.y, message.channel,"clean","white",12);
-                    }
-                });
-                break;
-            default:
-                break;
-        }
-    });
+    switch (message.type) {
+      case "subscribe":
+        if (isNullOrUndefined(message.name))
+          message.name = await usernameProvider.getRandomUsername();
+        subManager.subscribe(ws, message.channel, message.name);
+        subManager.getOldMessages(message.channel);
+        break;
+      case "shoot":
+        targetsManager.handleClientShooting(message);
+        break;
+      default:
+        console.log("Unhandled message came in:", message);
+        break;
+    }
+  });
 });
-
-
 
 // Assign a random channel to people opening the application
 app.get("/", (req, res) => {
-    res.redirect(`/${uuidv4()}`);
+  res.redirect(`/${uuidv4()}`);
 });
 
 app.get("/:channel", (req, res, next) => {
-    res.sendFile(path.join(PUBLIC_FOLDER, "index.html"), {}, err => {
-        if (err) {
-            next(err);
-        }
-    });
+  res.sendFile(path.join(PUBLIC_FOLDER, "index.html"), {}, err => {
+    if (err) {
+      next(err);
+    }
+  });
 });
 
 app.use(express.static(PUBLIC_FOLDER));
 
 server.listen(PORT, () => {
-    console.log(`Server started on port ${server.address().port}`);
-    setInterval(() => targManager.targetsManagement(), 5000);
+  console.log(`Server started on port ${server.address().port}`);
+  setInterval(() => targetsManager.targetsManagement(), 1500);
 });
