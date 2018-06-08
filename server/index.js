@@ -52,12 +52,11 @@ wss.on("connection", ws => {
                 "";
                 break;
             default:
-                redisPublisher.publish(message.channel, data);
+                /*redisPublisher.publish(message.channel, data);
                 redisLpush(message.channel, data)
-                    .then()
                     .catch(err => {
                         console.log(err);
-                    });
+                    });*/
                 break;
         }
     });
@@ -100,6 +99,7 @@ function publishTargetToChannel(x, y, channel) {
     });
     redisPublisher.publish(channel, payload);
 }
+
 
 // Assign a random channel to people opening the application
 app.get("/", (req, res) => {
