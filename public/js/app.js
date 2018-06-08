@@ -6,6 +6,7 @@ let size = 6;
 const CANVAS_RATIO = 300 / 200;
 
 // La channel actuelle est stoqué dans le hash
+const USERNAME = new URL(location.href).searchParams.get("name");
 const CURRENT_CHANNEL = location.pathname.slice(1);
 
 // Prepare the canvas
@@ -71,7 +72,7 @@ socket.addEventListener("open", () => {
 });
 
 function sendMessage(type, payload) {
-    const message = { type, payload, channel: CURRENT_CHANNEL };
+    const message = { type, payload, channel: CURRENT_CHANNEL, name: USERNAME };
     socket.send(JSON.stringify(message));
 }
 

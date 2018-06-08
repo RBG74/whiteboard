@@ -8,10 +8,11 @@ module.exports = class SubscriptionManager {
         this.socketsPerChannels = new Map();
         this.channelsPerSocket = new WeakMap();
         this.channelsUsed = [];
+        this.namePerSocket = new Map();
     }
 
     //Subscribe a socket to a specific channel.
-    subscribe(socket, channel) {
+    subscribe(socket, channel, name) {
         if (this.channelsUsed.indexOf(channel) == -1)
             this.channelsUsed.push(channel);
         let socketSubscribed =
@@ -19,15 +20,18 @@ module.exports = class SubscriptionManager {
         let channelSubscribed = this.channelsPerSocket.get(socket) || new Set();
 
         if (socketSubscribed.size == 0) {
-            console.log("Subscribed to " + channel);
             rcm.subscriber.subscribe(channel);
         }
+
+        this.namePerSocket.set(socket, name);
 
         socketSubscribed = socketSubscribed.add(socket);
         channelSubscribed = channelSubscribed.add(channel);
 
         this.socketsPerChannels.set(channel, socketSubscribed);
         this.channelsPerSocket.set(socket, channelSubscribed);
+
+        console.log(name, "just subscribed to channel", channel);
     }
 
     //Unsubscribe a socket from a specific channel.
@@ -39,16 +43,20 @@ module.exports = class SubscriptionManager {
             this.socketsPerChannels.get(channel) || new Set();
         let channelSubscribed = this.channelsPerSocket.get(socket) || new Set();
 
+        const name = this.namePerSocket.get(socket);
+        this.namePerSocket.delete(socket);
+
         socketSubscribed.delete(socket);
         channelSubscribed.delete(channel);
 
         if (socketSubscribed.size == 0) {
-            console.log("Unsubscribed to " + channel);
             rcm.subscriber.unsubscribe(channel);
         }
 
         this.socketsPerChannels.set(channel, socketSubscribed);
         this.channelsPerSocket.set(socket, channelSubscribed);
+
+        console.log(name, "just unsubscribed to channel", channel);
     }
 
     // Subscribe a socket from all channels.
@@ -69,6 +77,7 @@ module.exports = class SubscriptionManager {
         socketSubscribed.forEach(client => {
             client.send(data);
         });
+        console.log("Broadcasting", data, "to", socketSubscribed.length,"channels.")
     }
 
     // Get the last 2000 messages published in the channel and broadcasts them to the channel
