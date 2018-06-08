@@ -1,0 +1,3 @@
+Name socket when they connect (get param or auto assigned name)
+Keep score: the fastest socket to click the target gets a point.
+Handle leaderboard and send it on each update to the front.
