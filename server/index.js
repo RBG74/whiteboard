@@ -21,8 +21,6 @@ const redisconfig = require("./redis.config");
 const RedisClientManager = require("./RedisClientManager");
 const rcm = new RedisClientManager(redisconfig);
 
-// Manager for target
-const targetManager = require("./targetsManager");
 
 // Promosify the redis function we're gonna use
 //const redisLpush = promisify(rcm.client.lpush).bind(rcm.client);
@@ -32,6 +30,10 @@ const SubscriptionManager = require("./SubscriptionManager");
 const subManager = new SubscriptionManager(rcm);
 
 const targetsPerChannel = new Map();
+
+// Manager for target
+const targetManager = require("./targetsManager");
+const targManager = new targetManager(rcm, subManager, targetsPerChannel);
 
 rcm.subscriber.on("message", function(channel, message) {
     subManager.broadcastToSockets(channel, message);
@@ -65,7 +67,7 @@ wss.on("connection", ws => {
                         (diffY >= -10 && diffY <= 10)
                     ) {
                         targets.delete(position);
-                        targetManager.publishToChannel(position.x, position.y, message.channel,"clean","white",12);
+                        targManager.publishToChannel(position.x, position.y, message.channel,"clean","white",12);
                     }
                 });
                 break;
@@ -94,5 +96,5 @@ app.use(express.static(PUBLIC_FOLDER));
 
 server.listen(PORT, () => {
     console.log(`Server started on port ${server.address().port}`);
-    setInterval(() => targetManager.targetsManagement(), 5000);
+    setInterval(() => targManager.targetsManagement(), 5000);
 });
