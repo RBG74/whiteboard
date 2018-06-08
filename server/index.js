@@ -114,7 +114,7 @@ function publishCleanToChannel(x, y, channel){
         color: "white",
         size: 12
     });
-    redisPublisher.publish(channel, payload);
+    rcm.publisher.publish(channel, payload);
 }
 
 // Assign a random channel to people opening the application
