@@ -1,10 +1,9 @@
-const rcm = require("./redisClientManager");
 const promisify = require("util").promisify;
 
-const redisLrange = promisify(rcm.client.lrange).bind(rcm.client);
-
 module.exports = class SubscriptionManager {
-    constructor() {
+    constructor(redisclientmanager) {
+        this.rcm = redisclientmanager;
+
         this.socketsPerChannels = new Map();
         this.channelsPerSocket = new WeakMap();
         this.channelsUsed = [];
@@ -20,7 +19,7 @@ module.exports = class SubscriptionManager {
         let channelSubscribed = this.channelsPerSocket.get(socket) || new Set();
 
         if (socketSubscribed.size == 0) {
-            rcm.subscriber.subscribe(channel);
+            this.rcm.subscriber.subscribe(channel);
         }
 
         this.namePerSocket.set(socket, name);
@@ -50,7 +49,7 @@ module.exports = class SubscriptionManager {
         channelSubscribed.delete(channel);
 
         if (socketSubscribed.size == 0) {
-            rcm.subscriber.unsubscribe(channel);
+            this.rcm.subscriber.unsubscribe(channel);
         }
 
         this.socketsPerChannels.set(channel, socketSubscribed);
@@ -77,11 +76,12 @@ module.exports = class SubscriptionManager {
         socketSubscribed.forEach(client => {
             client.send(data);
         });
-        console.log("Broadcasting", data, "to", socketSubscribed.length,"channels.")
+        console.log("Broadcasting", data, "to", socketSubscribed.size,"clients.")
     }
 
     // Get the last 2000 messages published in the channel and broadcasts them to the channel
     getOldMessages(channel) {
+        const redisLrange = promisify(this.rcm.client.lrange).bind(this.rcm.client);
         redisLrange(channel, 0, 2000)
             .then(reply => {
                 //console.log(reply);

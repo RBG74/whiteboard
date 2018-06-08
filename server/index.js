@@ -17,14 +17,16 @@ const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
 // Initialize redis clients
-const rcm = require("./redisClientManager");
+const redisconfig = require("./redis.config");
+const RedisClientManager = require("./RedisClientManager");
+const rcm = new RedisClientManager(redisconfig);
 
 // Promosify the redis function we're gonna use
-const redisLpush = promisify(rcm.client.lpush).bind(rcm.client);
-const redisLrange = promisify(rcm.client.lrange).bind(rcm.client);
+//const redisLpush = promisify(rcm.client.lpush).bind(rcm.client);
+//const redisLrange = promisify(rcm.client.lrange).bind(rcm.client);
 
 const SubscriptionManager = require("./SubscriptionManager");
-const subManager = new SubscriptionManager(rcm.subscriber);
+const subManager = new SubscriptionManager(rcm);
 
 const targetsPerChannel = new Map();
 
