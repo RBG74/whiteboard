@@ -4,7 +4,6 @@ const http = require("http");
 const WebSocket = require("ws");
 const uuidv4 = require("uuid/v4");
 const promisify = require("util").promisify;
-const SubscriptionManager = require("./SubscriptionManager");
 const app = express();
 const PUBLIC_FOLDER = path.join(__dirname, "../public");
 const PORT = process.env.PORT || 5000;
@@ -16,19 +15,17 @@ const wss = new WebSocket.Server({ server });
 
 // Initialize redis clients
 const rcm = require("./redisClientManager");
-const redisClient = rcm.initializeRedisClient();
-const redisSubscriber = rcm.initializeRedisClient();
-const redisPublisher = rcm.initializeRedisClient();
 
 // Promosify the redis function we're gonna use
-const redisLpush = promisify(redisClient.lpush).bind(redisClient);
-const redisLrange = promisify(redisClient.lrange).bind(redisClient);
+const redisLpush = promisify(rcm.client.lpush).bind(rcm.client);
+const redisLrange = promisify(rcm.client.lrange).bind(rcm.client);
 
-const subManager = new SubscriptionManager(redisSubscriber);
+const SubscriptionManager = require("./SubscriptionManager");
+const subManager = new SubscriptionManager(rcm.subscriber);
 
 const targetsPerChannel = new Map();
 
-redisSubscriber.on("message", function(channel, message) {
+rcm.subscriber.on("message", function(channel, message) {
     console.log(channel, message);
     subManager.broadcastToSockets(channel, message);
 });
@@ -52,7 +49,7 @@ wss.on("connection", ws => {
                 "";
                 break;
             default:
-                /*redisPublisher.publish(message.channel, data);
+                /*rcm.publisher.publish(message.channel, data);
                 redisLpush(message.channel, data)
                     .catch(err => {
                         console.log(err);
@@ -97,7 +94,7 @@ function publishTargetToChannel(x, y, channel) {
         color: "red",
         size: 10
     });
-    redisPublisher.publish(channel, payload);
+    rcm.publisher.publish(channel, payload);
 }
 
 

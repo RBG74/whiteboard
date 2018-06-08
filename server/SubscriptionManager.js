@@ -1,6 +1,10 @@
+const rcm = require("./redisClientManager");
+const promisify = require("util").promisify;
+
+const redisLrange = promisify(rcm.client.lrange).bind(rcm.client);
+
 module.exports = class SubscriptionManager {
-    constructor(redisSubscriber) {
-        this.redisSubscriber = redisSubscriber;
+    constructor() {
         this.socketsPerChannels = new Map();
         this.channelsPerSocket = new WeakMap();
         this.channelsUsed = [];
@@ -16,7 +20,7 @@ module.exports = class SubscriptionManager {
 
         if (socketSubscribed.size == 0) {
             console.log("Subscribed to " + channel);
-            this.redisSubscriber.subscribe(channel);
+            rcm.subscriber.subscribe(channel);
         }
 
         socketSubscribed = socketSubscribed.add(socket);
@@ -40,11 +44,11 @@ module.exports = class SubscriptionManager {
 
         if (socketSubscribed.size == 0) {
             console.log("Unsubscribed to " + channel);
-            this.redisSubscriber.unsubscribe(channel);
+            rcm.subscriber.unsubscribe(channel);
         }
 
-        socketsPerChannels.set(channel, socketSubscribed);
-        channelsPerSocket.set(socket, channelSubscribed);
+        this.socketsPerChannels.set(channel, socketSubscribed);
+        this.channelsPerSocket.set(socket, channelSubscribed);
     }
 
     // Subscribe a socket from all channels.
@@ -53,7 +57,17 @@ module.exports = class SubscriptionManager {
             this.channelsPerSocket.get(socket) || new Set();
 
         channelSubscribed.forEach(channel => {
-            unsubscribe(socket, channel);
+            this.unsubscribe(socket, channel);
+        });
+    }
+
+    //Broadcast a message to all sockets connected to this server.
+    broadcastToSockets(channel, data) {
+        const socketSubscribed =
+            this.socketsPerChannels.get(channel) || new Set();
+
+        socketSubscribed.forEach(client => {
+            client.send(data);
         });
     }
 

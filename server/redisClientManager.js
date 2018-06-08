@@ -17,4 +17,7 @@ const initializeRedisClient = (config = redisconfig) => {
     client.auth(redisconfig.redisKey);
     return client;
 };
-module.exports.initializeRedisClient = initializeRedisClient;
+
+module.exports.client = initializeRedisClient();
+module.exports.subscriber = initializeRedisClient();
+module.exports.publisher = initializeRedisClient();
