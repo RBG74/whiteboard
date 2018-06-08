@@ -26,7 +26,6 @@ module.exports = class targetsManager {
     }
 
     targetsManagement() {
-        console.log("Targets management");
         this.subManager.channelsUsed.forEach(channel => {
             this.setTargetsForAChannel(channel);
         });
@@ -37,7 +36,6 @@ module.exports = class targetsManager {
         if (targets.size < 3) {
             const coordinates = this.getCoordinatesInRange(800, 500);
             targets = targets.add(coordinates);
-            console.log("ecriture de :");
             this.targetsPerChannel.set(channel, targets);
             this.publishToChannel(coordinates.x, coordinates.y, channel, "target", "red", 10);
         }
