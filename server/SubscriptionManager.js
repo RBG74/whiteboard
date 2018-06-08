@@ -77,7 +77,7 @@ module.exports = class SubscriptionManager {
             .then(reply => {
                 //console.log(reply);
                 reply.forEach(element => {
-                    subManager.broadcastToSockets(channel, element);
+                    this.broadcastToSockets(channel, element);
                 });
             })
             .catch(err => {
