@@ -9,8 +9,8 @@ body, html {
 #application {
     display: flex;
     margin: 20px auto;
-    width: 100%;
-    max-width: 800px;
+    width: 844px;
+    height: 544px;
     background: #fff;
     flex-direction: column;
     padding: 20px;
@@ -19,7 +19,8 @@ body, html {
 }
 
 #canvas-container {
-    width: 100%;
+    width: 804px;
+    height: 504px;
     border: 2px dashed #f5f5f5;
     border-radius: 5px;
 }

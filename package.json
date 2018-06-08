@@ -2,7 +2,7 @@
   "name": "whiteboard",
   "version": "0.0.0",
   "description": "Realtime drawing application",
-  "main": "index.js",
+  "main": "server/index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },

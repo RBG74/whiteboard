@@ -1,0 +1,4 @@
+Every n seconds a target appears on everybody's canvas.
+The fastest to click it wins (display message on each sockets).
+
+Leaderboard?

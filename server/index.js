@@ -6,17 +6,40 @@ const uuidv4 = require("uuid/v4");
 const { promisify } = require("util");
 
 const redis = require("redis");
-const redisClient = redis.createClient();
-const redisPublisher = redis.createClient();
-const redisSubscriber = redis.createClient();
+
+// Initialize redis clients
+var redisClient = redis.createClient(
+    "12628",
+    "redis-12628.c3.eu-west-1-1.ec2.cloud.redislabs.com",
+    { no_ready_check: true }
+);
+redisClient.auth("fTHIB9NGouXBvEJQ5pBRcvihfYATQ0bL");
+const redisPublisher = redis.createClient(
+    "12628",
+    "redis-12628.c3.eu-west-1-1.ec2.cloud.redislabs.com",
+    { no_ready_check: true }
+);
+redisPublisher.auth("fTHIB9NGouXBvEJQ5pBRcvihfYATQ0bL");
+const redisSubscriber = redis.createClient(
+    "12628",
+    "redis-12628.c3.eu-west-1-1.ec2.cloud.redislabs.com",
+    { no_ready_check: true }
+);
+redisSubscriber.auth("fTHIB9NGouXBvEJQ5pBRcvihfYATQ0bL");
+
+// Promosify the redis function we're gonna use
+const redisLpush = promisify(redisClient.lpush).bind(redisClient);
+const redisLrange = promisify(redisClient.lrange).bind(redisClient);
 
 const app = express();
 
 const PUBLIC_FOLDER = path.join(__dirname, "../public");
 const PORT = process.env.PORT || 5000;
 
-const socketsPerChannels /* Map<string, Set<WebSocket>> */ = new Map();
-const channelsPerSocket /* WeakMap<WebSocket, Set<string> */ = new WeakMap();
+const socketsPerChannels = new Map();
+const channelsPerSocket = new WeakMap();
+const channelsUsed = [];
+const targetsPerChannel = new Map();
 
 // Initialize a simple http server
 const server = http.createServer(app);
@@ -24,13 +47,11 @@ const server = http.createServer(app);
 // Initialize the WebSocket server instance
 const wss = new WebSocket.Server({ server });
 
-const redisLpush = promisify(redisClient.lpush).bind(redisClient);
-const redisLrange = promisify(redisClient.lrange).bind(redisClient);
-
 /*
  * Subscribe a socket to a specific channel.
  */
 function subscribe(socket, channel) {
+    if (channelsUsed.indexOf(channel) == -1) channelsUsed.push(channel);
     let socketSubscribed = socketsPerChannels.get(channel) || new Set();
     let channelSubscribed = channelsPerSocket.get(socket) || new Set();
 
@@ -50,6 +71,8 @@ function subscribe(socket, channel) {
  * Unsubscribe a socket from a specific channel.
  */
 function unsubscribe(socket, channel) {
+    if (channelsUsed.indexOf(channel) > -1)
+        channelsUsed.splice(channelsUsed.indexOf(channel));
     let socketSubscribed = socketsPerChannels.get(channel) || new Set();
     let channelSubscribed = channelsPerSocket.get(socket) || new Set();
 
@@ -88,9 +111,9 @@ function broadcastToSockets(channel, data) {
 }
 
 function getOldMessages(channel) {
-    redisLrange(channel, 0, -1)
+    redisLrange(channel, 0, 2000)
         .then(reply => {
-            console.log(reply);
+            //console.log(reply);
             reply.forEach(element => {
                 broadcastToSockets(channel, element);
             });
@@ -101,6 +124,7 @@ function getOldMessages(channel) {
 }
 
 redisSubscriber.on("message", function(channel, message) {
+    console.log(channel, message);
     broadcastToSockets(channel, message);
 });
 
@@ -118,6 +142,9 @@ wss.on("connection", ws => {
                 subscribe(ws, message.channel);
                 getOldMessages(message.channel);
                 break;
+            case "shoot":
+                "";
+                break;
             default:
                 redisPublisher.publish(message.channel, data);
                 redisLpush(message.channel, data)
@@ -129,6 +156,44 @@ wss.on("connection", ws => {
         }
     });
 });
+
+function getCoordinatesInRange(maxX, maxY) {
+    const x = Math.floor(Math.random() * maxX);
+    const y = Math.floor(Math.random() * maxY);
+    return { x: x, y: y };
+}
+
+function targetsManagement() {
+    console.log("Targets management");
+    channelsUsed.forEach(channel => {
+        setTargetsForAChannel(channel);
+    });
+}
+
+function setTargetsForAChannel(channel) {
+    let targets = targetsPerChannel.get(channel) || new Set();
+    if (targets.size < 3) {
+        const coordinates = getCoordinatesInRange(800, 500);
+
+        targets = targets.add(coordinates);
+
+        targetsPerChannel.set(channel, targets);
+
+        publishTargetToChannel(coordinates.x, coordinates.y, channel);
+    }
+}
+
+function publishTargetToChannel(x, y, channel){
+    const payload = JSON.stringify({
+        channel: channel,
+        type: "target",
+        x: x,
+        y: y,
+        color: "red",
+        size: 10
+    });
+    redisPublisher.publish(channel, payload);
+}
 
 // Assign a random channel to people opening the application
 app.get("/", (req, res) => {
@@ -147,4 +212,5 @@ app.use(express.static(PUBLIC_FOLDER));
 
 server.listen(PORT, () => {
     console.log(`Server started on port ${server.address().port}`);
+    setInterval(() => targetsManagement(), 5000);
 });
