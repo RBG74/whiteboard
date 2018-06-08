@@ -4,9 +4,12 @@ const http = require("http");
 const WebSocket = require("ws");
 const uuidv4 = require("uuid/v4");
 const promisify = require("util").promisify;
+const isNullOrUndefined = require("util").isNullOrUndefined;
 const app = express();
 const PUBLIC_FOLDER = path.join(__dirname, "../public");
 const PORT = process.env.PORT || 5000;
+
+const usernameProvider = require("./provider/usernameProvider");
 
 // Initialize a simple http server
 const server = http.createServer(app);
@@ -14,22 +17,23 @@ const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
 // Initialize redis clients
-const rcm = require("./redisClientManager");
+const redisconfig = require("./redis.config");
+const RedisClientManager = require("./RedisClientManager");
+const rcm = new RedisClientManager(redisconfig);
 
 // Manager for target
 const targetManager = require("./targetsManager");
 
 // Promosify the redis function we're gonna use
-const redisLpush = promisify(rcm.client.lpush).bind(rcm.client);
-const redisLrange = promisify(rcm.client.lrange).bind(rcm.client);
+//const redisLpush = promisify(rcm.client.lpush).bind(rcm.client);
+//const redisLrange = promisify(rcm.client.lrange).bind(rcm.client);
 
 const SubscriptionManager = require("./SubscriptionManager");
-const subManager = new SubscriptionManager(rcm.subscriber);
+const subManager = new SubscriptionManager(rcm);
 
 const targetsPerChannel = new Map();
 
 rcm.subscriber.on("message", function(channel, message) {
-    console.log(channel, message);
     subManager.broadcastToSockets(channel, message);
 });
 
@@ -39,21 +43,27 @@ wss.on("connection", ws => {
         subManager.unsubscribeAll(ws);
     });
 
-    ws.on("message", data => {
+    ws.on("message", async data => {
         //TODO: handle socket shooting target
         const message = JSON.parse(data.toString());
 
         switch (message.type) {
             case "subscribe":
-                subManager.subscribe(ws, message.channel);
+                if (isNullOrUndefined(message.name))
+                    message.name = await usernameProvider.getRandomUsername();
+                subManager.subscribe(ws, message.channel, message.name);
                 subManager.getOldMessages(message.channel);
                 break;
             case "shoot":
-                const targets = targetsPerChannel.get(message.channel) ;
+                const targets = targetsPerChannel.get(message.channel);
                 targets.forEach(position => {
                     let diffX = position.x - message.payload.x;
                     let diffY = position.y - message.payload.y;
-                    if((diffX >= -10 && diffX <= 10) && (diffY >= -10 && diffY <= 10)){
+                    if (
+                        diffX >= -10 &&
+                        diffX <= 10 &&
+                        (diffY >= -10 && diffY <= 10)
+                    ) {
                         targets.delete(position);
                         targetManager.publishToChannel(position.x, position.y, message.channel,"clean","white",12);
                     }
