@@ -45,12 +45,22 @@ socket.addEventListener("message", event => {
 
     
     if (message.type == "target") {
-        console.log("target", message);
+        //console.log("target", message);
         drawInCanvas(
             ctx,
             message.x,
             message.y,
             message.color,
+            message.size
+        );
+    }
+
+    if (message.type == "clean") {
+        drawInCanvas(
+            ctx,
+            message.x,
+            message.y,
+            "#ffffff",
             message.size
         );
     }
@@ -113,7 +123,7 @@ const onMouseDown = (event) => {
     isPressingCanvas = true;
     const x = event.pageX - canvas.offsetLeft;
     const y = event.pageY - canvas.offsetTop;
-
+    //jonathan
     sendMessage("shoot", {
         x,
         y

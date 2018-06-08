@@ -143,7 +143,16 @@ wss.on("connection", ws => {
                 getOldMessages(message.channel);
                 break;
             case "shoot":
-                "";
+                const targets = targetsPerChannel.get(message.channel) ;
+                targets.forEach(position => {
+                    let diffX = position.x - message.payload.x;
+                    let diffY = position.y - message.payload.y;
+                    if((diffX >= -10 && diffX <= 10) && (diffY >= -10 && diffY <= 10)){
+                        targets.delete(position);
+                        publishCleanToChannel(position.x, position.y, message.channel);
+
+                    }
+                });
                 break;
             default:
                 redisPublisher.publish(message.channel, data);
@@ -164,7 +173,7 @@ function getCoordinatesInRange(maxX, maxY) {
 }
 
 function targetsManagement() {
-    console.log("Targets management");
+    //console.log("Targets management");
     channelsUsed.forEach(channel => {
         setTargetsForAChannel(channel);
     });
@@ -174,9 +183,8 @@ function setTargetsForAChannel(channel) {
     let targets = targetsPerChannel.get(channel) || new Set();
     if (targets.size < 3) {
         const coordinates = getCoordinatesInRange(800, 500);
-
         targets = targets.add(coordinates);
-
+        console.log("ecriture de :");
         targetsPerChannel.set(channel, targets);
 
         publishTargetToChannel(coordinates.x, coordinates.y, channel);
@@ -191,6 +199,18 @@ function publishTargetToChannel(x, y, channel){
         y: y,
         color: "red",
         size: 10
+    });
+    redisPublisher.publish(channel, payload);
+}
+
+function publishCleanToChannel(x, y, channel){
+    const payload = JSON.stringify({
+        channel: channel,
+        type: "clean",
+        x: x,
+        y: y,
+        color: "white",
+        size: 12
     });
     redisPublisher.publish(channel, payload);
 }
