@@ -36,7 +36,7 @@ redisSubscriber.on("message", function(channel, message) {
 // Broadcast message from client
 wss.on("connection", ws => {
     ws.on("close", () => {
-        unsubscribeAll(ws);
+        subManager.unsubscribeAll(ws);
     });
 
     ws.on("message", data => {
