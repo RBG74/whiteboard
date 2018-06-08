@@ -55,7 +55,7 @@ module.exports = class SubscriptionManager {
         this.socketsPerChannels.set(channel, socketSubscribed);
         this.channelsPerSocket.set(socket, channelSubscribed);
 
-        console.log(name, "just unsubscribed to channel", channel);
+        console.log(name, "just unsubscribed from channel", channel);
     }
 
     // Subscribe a socket from all channels.
