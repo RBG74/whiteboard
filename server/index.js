@@ -3,119 +3,37 @@ const express = require("express");
 const http = require("http");
 const WebSocket = require("ws");
 const uuidv4 = require("uuid/v4");
-const { promisify } = require("util");
+const promisify = require("util").promisify;
+const SubscriptionManager = require("./SubscriptionManager");
+const app = express();
+const PUBLIC_FOLDER = path.join(__dirname, "../public");
+const PORT = process.env.PORT || 5000;
 
-const redis = require("redis");
+// Initialize a simple http server
+const server = http.createServer(app);
+// Initialize the WebSocket server instance
+const wss = new WebSocket.Server({ server });
 
 // Initialize redis clients
-var redisClient = redis.createClient(
-    "12628",
-    "redis-12628.c3.eu-west-1-1.ec2.cloud.redislabs.com",
-    { no_ready_check: true }
-);
-redisClient.auth("fTHIB9NGouXBvEJQ5pBRcvihfYATQ0bL");
-const redisPublisher = redis.createClient(
-    "12628",
-    "redis-12628.c3.eu-west-1-1.ec2.cloud.redislabs.com",
-    { no_ready_check: true }
-);
-redisPublisher.auth("fTHIB9NGouXBvEJQ5pBRcvihfYATQ0bL");
-const redisSubscriber = redis.createClient(
-    "12628",
-    "redis-12628.c3.eu-west-1-1.ec2.cloud.redislabs.com",
-    { no_ready_check: true }
-);
-redisSubscriber.auth("fTHIB9NGouXBvEJQ5pBRcvihfYATQ0bL");
+const rcm = require("./redisClientManager");
+const redisClient = rcm.initializeRedisClient();
+const redisSubscriber = rcm.initializeRedisClient();
+const redisPublisher = rcm.initializeRedisClient();
 
 // Promosify the redis function we're gonna use
 const redisLpush = promisify(redisClient.lpush).bind(redisClient);
 const redisLrange = promisify(redisClient.lrange).bind(redisClient);
 
-const app = express();
+const subManager = new SubscriptionManager(redisSubscriber);
 
-const PUBLIC_FOLDER = path.join(__dirname, "../public");
-const PORT = process.env.PORT || 5000;
-
-const socketsPerChannels = new Map();
-const channelsPerSocket = new WeakMap();
-const channelsUsed = [];
 const targetsPerChannel = new Map();
-
-// Initialize a simple http server
-const server = http.createServer(app);
-
-// Initialize the WebSocket server instance
-const wss = new WebSocket.Server({ server });
-
-/*
- * Subscribe a socket to a specific channel.
- */
-function subscribe(socket, channel) {
-    if (channelsUsed.indexOf(channel) == -1) channelsUsed.push(channel);
-    let socketSubscribed = socketsPerChannels.get(channel) || new Set();
-    let channelSubscribed = channelsPerSocket.get(socket) || new Set();
-
-    if (socketSubscribed.size == 0) {
-        console.log("Subscribed to " + channel);
-        redisSubscriber.subscribe(channel);
-    }
-
-    socketSubscribed = socketSubscribed.add(socket);
-    channelSubscribed = channelSubscribed.add(channel);
-
-    socketsPerChannels.set(channel, socketSubscribed);
-    channelsPerSocket.set(socket, channelSubscribed);
-}
-
-/*
- * Unsubscribe a socket from a specific channel.
- */
-function unsubscribe(socket, channel) {
-    if (channelsUsed.indexOf(channel) > -1)
-        channelsUsed.splice(channelsUsed.indexOf(channel));
-    let socketSubscribed = socketsPerChannels.get(channel) || new Set();
-    let channelSubscribed = channelsPerSocket.get(socket) || new Set();
-
-    socketSubscribed.delete(socket);
-    channelSubscribed.delete(channel);
-
-    if (socketSubscribed.size == 0) {
-        console.log("Unsubscribed to " + channel);
-        redisSubscriber.unsubscribe(channel);
-    }
-
-    socketsPerChannels.set(channel, socketSubscribed);
-    channelsPerSocket.set(socket, channelSubscribed);
-}
-
-/*
- * Subscribe a socket from all channels.
- */
-function unsubscribeAll(socket) {
-    const channelSubscribed = channelsPerSocket.get(socket) || new Set();
-
-    channelSubscribed.forEach(channel => {
-        unsubscribe(socket, channel);
-    });
-}
-
-/*
- * Broadcast a message to all sockets connected to this server.
- */
-function broadcastToSockets(channel, data) {
-    const socketSubscribed = socketsPerChannels.get(channel) || new Set();
-
-    socketSubscribed.forEach(client => {
-        client.send(data);
-    });
-}
 
 function getOldMessages(channel) {
     redisLrange(channel, 0, 2000)
         .then(reply => {
             //console.log(reply);
             reply.forEach(element => {
-                broadcastToSockets(channel, element);
+                subManager.broadcastToSockets(channel, element);
             });
         })
         .catch(err => {
@@ -125,7 +43,7 @@ function getOldMessages(channel) {
 
 redisSubscriber.on("message", function(channel, message) {
     console.log(channel, message);
-    broadcastToSockets(channel, message);
+    subManager.broadcastToSockets(channel, message);
 });
 
 // Broadcast message from client
@@ -135,11 +53,12 @@ wss.on("connection", ws => {
     });
 
     ws.on("message", data => {
+        //TODO: handle socket shooting target
         const message = JSON.parse(data.toString());
 
         switch (message.type) {
             case "subscribe":
-                subscribe(ws, message.channel);
+                subManager.subscribe(ws, message.channel);
                 getOldMessages(message.channel);
                 break;
             case "shoot":
@@ -165,7 +84,7 @@ function getCoordinatesInRange(maxX, maxY) {
 
 function targetsManagement() {
     console.log("Targets management");
-    channelsUsed.forEach(channel => {
+    subManager.channelsUsed.forEach(channel => {
         setTargetsForAChannel(channel);
     });
 }
@@ -183,7 +102,7 @@ function setTargetsForAChannel(channel) {
     }
 }
 
-function publishTargetToChannel(x, y, channel){
+function publishTargetToChannel(x, y, channel) {
     const payload = JSON.stringify({
         channel: channel,
         type: "target",
