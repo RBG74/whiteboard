@@ -1,7 +1,5 @@
 # Whiteboard
 
-Base de code pour les exercices de cours.
+### TP:
 
-### Exercise 3:
-
-Utiliser `redis` pour broadcaster les messages à travers plusieurs instances de l'application.
+Recyclage du whiteboard pour en faire un canvas avec des cibles qui apparaissent régulièrement. Le client qui cliques le plus vite gagne.
